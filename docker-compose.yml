@@ -36,9 +36,94 @@ services:
       retries:  10
     networks:
       - cloudeats-network
+  
+    # ── Add these two services ─────────────────────
+
+  redis:
+    image: redis:8-alpine
+    container_name: cloudeats-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - cloudeats-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  mongo:
+    image: mongo:7
+    container_name: cloudeats-mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - cloudeats-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  user-service:
+    build: ./services/user-service
+    container_name: cloudeats-user-service
+    ports:
+      - "3001:3001"
+    environment:
+      DB_HOST:     db
+      DB_USER:     cloudeats_user
+      DB_PASSWORD: cloudeats_password
+      DB_NAME:     cloudeats_db
+      PORT:        3001
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - cloudeats-network
+    restart: unless-stopped
+
+  menu-service:
+    build: ./services/menu-service
+    container_name: cloudeats-menu-service
+    ports:
+      - "3002:3002"
+    environment:
+      DB_HOST:     db
+      DB_USER:     cloudeats_user
+      DB_PASSWORD: cloudeats_password
+      DB_NAME:     cloudeats_db
+      PORT:        3002
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - cloudeats-network
+    restart: unless-stopped
+
+  order-service:
+    build: ./services/order-service
+    container_name: cloudeats-order-service
+    ports:
+      - "3003:3003"
+    environment:
+      MONGO_URL: mongodb://mongo:27017
+      REDIS_URL: redis://redis:6379
+      PORT:      3003
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - cloudeats-network
+    restart: unless-stopped
 
 volumes:
   mysql-data:
+  mongo-data:
 
 networks:
   cloudeats-network:
