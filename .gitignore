@@ -12,3 +12,5 @@ logs/
 Thumbs.db
 .vscode/
 .idea/
+node_modules/
+npm-debug.log*
