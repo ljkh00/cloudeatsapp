@@ -36,6 +36,19 @@ jobs:
         working-directory: ./services/menu-service
         run: npm ci          # clean install from package-lock.json
 
+      - name: Detect changed services
+        id: changes
+        run: |
+          git fetch --quiet origin
+          CHANGED=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep '^services/' | cut -d/ -f2 | sort -u | tr '\n' ' ' || true)
+          echo "services=$CHANGED" >> "$GITHUB_OUTPUT"
+          
+      - name: Redeploy changed services
+        if: steps.changes.outputs.services != ''
+        run: |
+          cd ~/cloudeats-app && git pull --ff-only origin main
+          docker compose up -d --build --no-deps ${{ steps.changes.outputs.services }}
+
       # Step 4: Run the test suite
       - name: Run tests
         working-directory: ./services/menu-service
