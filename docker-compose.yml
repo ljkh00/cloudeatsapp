@@ -29,11 +29,13 @@ services:
     volumes:
       - mysql-data:/var/lib/mysql
       - ./backend/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - ./backend/roles.sql:/docker-entrypoint-initdb.d/roles.sql:ro   # ← NEW in 8.2
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prootpassword"]
       interval: 5s
       timeout:  5s
-      retries:  10
+      retries:  30
+      start_period: 240s   # first-run init is slow on this host
     networks:
       - cloudeats-network
   
@@ -76,14 +78,19 @@ services:
       DB_HOST:     db
       DB_USER:     cloudeats_user
       DB_PASSWORD: cloudeats_password
-      DB_NAME:     cloudeats_db
+      DB_NAME:     ${MYSQL_DATABASE:-cloudeats_db}
+      LOG_LEVEL: ${LOG_LEVEL:-http}
       PORT:        3001
+      JWT_SECRET:     ${JWT_SECRET:?Set JWT_SECRET in .env}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-24h}
     depends_on:
       db:
         condition: service_healthy
     networks:
       - cloudeats-network
     restart: unless-stopped
+    volumes:
+      - user_logs:/app/logs
 
   menu-service:
     build: ./services/menu-service
@@ -136,6 +143,7 @@ services:
       MENU_SERVICE_URL:  http://menu-service:3002
       ORDER_SERVICE_URL: http://order-service:3003
       PORT: 8000
+      JWT_SECRET:     ${JWT_SECRET:?Set JWT_SECRET in .env}
     depends_on:
       - user-service
       - menu-service
@@ -145,8 +153,9 @@ services:
     restart: unless-stopped
 
 volumes:
-  mysql-data:
-  mongo-data:
+    mysql-data:
+    mongo-data:
+    user_logs:
 
 networks:
   cloudeats-network:

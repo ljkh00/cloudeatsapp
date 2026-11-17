@@ -1,6 +1,13 @@
 const express      = require('express');
 const cors         = require('cors');
 const { createProxyMiddleware } = require('http-proxy-middleware');
+const jwt = require('jsonwebtoken');           // ← NEW
+
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  console.error('[api-gateway] JWT_SECRET is not set — exiting');
+  process.exit(1);
+}
 
 const app = express();
 app.use(cors());
@@ -24,6 +31,7 @@ function proxy(target) {
   return createProxyMiddleware({
     target,
     changeOrigin: true,
+    xfwd: true,
     // app.use('/api/menu', …) strips '/api/menu' from req.url, but our services
     // define full paths (/api/menu/…). Put the original URL back.
     pathRewrite: (path, req) => req.originalUrl,
@@ -37,6 +45,57 @@ function proxy(target) {
       }
     }
   });
+}
+
+// ── 1. Who are you? Verify the JWT ──
+function authenticateToken(req, res, next) {
+  const authHeader = req.headers['authorization'];
+  const token      = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).json({ error: 'No token provided. Please log in.' });
+  }
+
+  jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] }, (err, decoded) => {
+    if (err) {
+      return res.status(401).json({ error: 'Invalid or expired token. Please log in again.' });
+    }
+    req.user = decoded;   // { userId, email, name, iat, exp }
+
+    // Tell the services who is calling. This OVERWRITES any x-user-id the
+    // client tried to send, so it cannot be forged.
+    req.headers['x-user-id']    = String(decoded.userId);
+    req.headers['x-user-email'] = String(decoded.email);
+    req.headers['x-user-role']  = String(decoded.role || 'customer');
+    next();
+  });
+}
+
+// ── 2. Is this YOUR data? Compare token user with the :userId in the URL ──
+function requireSelf(req, res, next) {
+  if (String(req.user.userId) !== req.params.userId) {
+    return res.status(403).json({
+      error: 'Access denied. You can only access your own data.'
+    });
+  }
+  next();
+}
+
+// ── 3. Are you ALLOWED to do this? Check the role in the token ──
+// Usage: requireRole('admin')  or  requireRole('admin', 'owner')
+function requireRole(...allowed) {
+  return (req, res, next) => {
+    // authenticateToken must run first, so req.user exists
+    if (!req.user) {
+      return res.status(401).json({ error: 'Not authenticated.' });
+    }
+    if (!allowed.includes(req.user.role)) {
+      return res.status(403).json({
+        error: 'Access denied. This route requires role: ' + allowed.join(' or ') + '.'
+      });
+    }
+    next();
+  };
 }
 
 // ══════════════════════════════════════════════════════
@@ -53,6 +112,9 @@ app.use('/api/menu',   proxy(SERVICES.menu));
 // ── Order Service ──────────────────────────────────────
 app.use('/api/cart',   proxy(SERVICES.order));  // Week 8: add authenticateToken
 app.use('/api/orders', proxy(SERVICES.order));  // Week 8: add authenticateToken
+
+// Admin only: valid token AND role = admin
+app.use('/api/admin', authenticateToken, requireRole('admin'), proxy(SERVICES.user));
 
 // ── 404 for unknown routes ─────────────────────────────
 app.use((req, res) =>
