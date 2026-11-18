@@ -2,8 +2,12 @@ const express      = require('express');
 const cors         = require('cors');
 const { createProxyMiddleware } = require('http-proxy-middleware');
 
+const path = require('path');
+const { register, metricsMiddleware } = require('./metrics');
+
 const app = express();
 app.use(cors());
+app.use(metricsMiddleware);   // counts every request that passes through
 // Do NOT add express.json() here. It would consume the request body and
 // the proxied POST/PUT requests would hang. The gateway only forwards bytes.
 
@@ -24,6 +28,7 @@ function proxy(target) {
   return createProxyMiddleware({
     target,
     changeOrigin: true,
+    xfwd: true,          // add X-Forwarded-For so services see the real client IP
     // app.use('/api/menu', …) strips '/api/menu' from req.url, but our services
     // define full paths (/api/menu/…). Put the original URL back.
     pathRewrite: (path, req) => req.originalUrl,
