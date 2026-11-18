@@ -70,6 +70,7 @@ function authenticateToken(req, res, next) {
     // client tried to send, so it cannot be forged.
     req.headers['x-user-id']    = String(decoded.userId);
     req.headers['x-user-email'] = String(decoded.email);
+    req.headers['x-user-role']  = String(decoded.role || 'customer'); 
     next();
   });
 }
@@ -83,9 +84,28 @@ function requireSelf(req, res, next) {
   }
   next();
 }
+// ── 3. Are you ALLOWED to do this? Check the role in the token ──
+// Usage: requireRole('admin')  or  requireRole('admin', 'owner')
+function requireRole(...allowed) {
+  return (req, res, next) => {
+    // authenticateToken must run first, so req.user exists
+    if (!req.user) {
+      return res.status(401).json({ error: 'Not authenticated.' });
+    }
+    if (!allowed.includes(req.user.role)) {
+      return res.status(403).json({
+        error: 'Access denied. This route requires role: ' + allowed.join(' or ') + '.'
+      });
+    }
+    next();
+  };
+}
 // ══════════════════════════════════════════════════════
 //  ROUTE TABLE
 // ══════════════════════════════════════════════════════
+
+// Admin only: valid token AND role = admin
+app.use('/api/admin', authenticateToken, requireRole('admin'), proxy(SERVICES.user));
 
 // Public
 app.use('/api/auth', proxy(SERVICES.user));    // register + login
