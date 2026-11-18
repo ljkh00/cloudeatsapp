@@ -38,10 +38,17 @@ const registrations = new client.Counter({
   registers: [register]
 });
 
-// /api/users/42 and /api/users/43 must be ONE label, or memory grows forever
+// /api/users/42 and /api/users/43 must be ONE label, or memory grows forever.
+// Paths the gateway does not know (scanners, typos) all share ONE label too,
+// so a bot cannot create millions of labels or inject text into the dashboard.
+const KNOWN = ['/api/auth', '/api/users', '/api/menu', '/api/cart', '/api/orders', '/api/admin', '/health', '/dashboard'];
 function routeLabel(req) {
   const parts = req.originalUrl.split('?')[0].split('/').filter(Boolean);
-  return '/' + parts.slice(0, 2).join('/');
+  const label = '/' + parts.slice(0, 2).join('/');
+  const one   = '/' + (parts[0] || '');
+  if (KNOWN.includes(label)) return label;
+  if (KNOWN.includes(one))   return one;
+  return 'other';
 }
 
 function metricsMiddleware(req, res, next) {
