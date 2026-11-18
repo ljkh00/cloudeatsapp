@@ -85,24 +85,17 @@ app.post('/api/auth/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    // Week 8 will return a JWT here instead
     // Payload = who this user is. Never put password data in a token.
     const token = jwt.sign(
-      { userId: user.id, email: user.email, name: user.full_name },
+      { userId: user.id, email: user.email, name: user.full_name, role: user.role },
       process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_EXPIRES_IN || '24h' }
     );
 
     res.json({
       message:  'Login successful',
-      token,                       // ← NEW
-      userId:   user.id,
-      fullName: user.full_name,
-      email:    user.email
-    });
-
-    res.json({
-      message:  'Login successful',
+      token,
+      role:     user.role,
       userId:   user.id,
       fullName: user.full_name,
       email:    user.email

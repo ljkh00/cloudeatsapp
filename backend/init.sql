@@ -14,17 +14,6 @@ CREATE TABLE IF NOT EXISTS menu_items (
 );
 
 -- ── USERS TABLE ────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS users (
-  id            INT AUTO_INCREMENT PRIMARY KEY,
-  email         VARCHAR(255) UNIQUE NOT NULL,        -- No duplicate accounts
-  password_hash VARCHAR(255) NOT NULL,               -- NEVER plain text
-  full_name     VARCHAR(255) NOT NULL,
-  phone         VARCHAR(20),                           -- Optional
-  created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  INDEX idx_email (email)                           -- Fast login lookup by email
-);
-
 -- Seed sample menu items (only insert if table is empty)
 INSERT INTO menu_items (name, category, price, description, badge, rating) VALUES
   ('Nasi Lemak Special',    'Breakfast', 12.00, 'Fragrant coconut rice with sambal, fried chicken, egg & peanuts', 'Best Seller', NULL),
@@ -62,10 +51,6 @@ CREATE TABLE IF NOT EXISTS orders (
   INDEX idx_user_id (user_id),
   INDEX idx_status  (status)
 );
--- Laksa (added in Lab 6.1)
-INSERT INTO menu_items (name, category, price, description, badge)
-VALUES ('Laksa', 'Noodles', 9.50, 'Spicy coconut noodle soup with prawns and tofu puffs', NULL);
-
 -- Laksa (added in Lab 6.1)
 INSERT INTO menu_items (name, category, price, description, badge)
 VALUES ('Laksa', 'Noodles', 9.50, 'Spicy coconut noodle soup with prawns and tofu puffs', NULL);
