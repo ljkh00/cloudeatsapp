@@ -75,12 +75,10 @@ app.post('/api/cart/:userId/items', async (req, res) => {
 
 // ── POST /api/orders  — checkout   body: { userId, items? }  (items default to the cart)
 app.post('/api/orders', async (req, res) => {
-  const userId = Number(req.body.userId);
+  // AFTER — identity comes from the gateway (verified JWT), never from the body
+  const userId = Number(req.headers['x-user-id']);
   if (!userId) {
-    return res.status(400).json({ error: 'userId is required' });
-  }
-  if (!ordersDb) {
-    return res.status(503).json({ error: 'Order database not ready' });
+    return res.status(400).json({ error: 'Missing x-user-id — call this service through the gateway' });
   }
   try {
     const userRes = await fetch(
